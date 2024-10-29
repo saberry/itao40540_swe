@@ -182,8 +182,8 @@ def predictor_outcome_split(data_name):
         predictors = data_name.drop('separatedNY', axis=1)
         outcome = data_name['separatedNY']
         return predictors, outcome
-    except KeyError: 
-      print('No separated outcome column detected!')
+  except: 
+    raise('No separated outcome column detected!') 
     
 predictor_outcome_split(test_data)
 predictor_outcome_split(bad_df)
@@ -192,7 +192,7 @@ predictor_outcome_split(worst_df)
 
 ## Unit Testing
 
-If the idea of writing code to test code sounds fun, then unit testing is going to be your jam! Even if that sounds horrible, it is a useful endeavour. As you can see from above, testing these functions can be a bit of a pain.  Unit tests offer us a way to programmatically test functions. While there is some setup work, it will be well worth it in the end!
+If the idea of writing code to test code sounds fun, then unit testing is going to be your jam! Even if that sounds horrible, it is a useful endeavor. As you can see from above, testing these functions can be a bit of a pain.  Unit tests offer us a way to programmatically test functions. While there is some setup work, it will be well worth it in the end!
 
 If we wanted to get fancy, we could move our function to a class:
 
@@ -230,7 +230,6 @@ And save that to a file called, `data_preparation.py` and test through the termi
 import unittest
 
 class TestPreparation(unittest.TestCase):
-  
   def test_predictor_outcome_split(self):
     """Good Test"""
     test_data = pd.read_html(link, match='department', header=0)
@@ -257,20 +256,11 @@ class TestPreparation(unittest.TestCase):
     self.assertIsInstance(predictors, pd.DataFrame)
     self.assertIsInstance(outcome, pd.Series)
       
-  def test_worst_data(self):
-    """Worst Test"""
-    worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
-    worst_df = pd.DataFrame(data=worst_columns)
-    with self.assertRaises(KeyError):
-      predictors, outcome = predictor_outcome_split(worst_df)
-      
   def test_worse_data_wrong(self):
-    """Testing if worst data is not intance of DataFrame or series"""
-    worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [15, 14, 13, 12, 11]} 
+    """Testing if worst data is None type"""
+    worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [15, 14, 13, 12, 11]}
     worst_df = pd.DataFrame(data=worst_columns)
-    predictors, outcome = predictor_outcome_split(worst_df)
-    self.assertNotIsInstance(predictors, pd.DataFrame)
-    self.assertNotIsInstance(outcome, pd.Series)
+    self.assertTrue(predictor_outcome_split(worst_df) == None)
 
 if __name__ == '__main__':
   unittest.main(verbosity=3)
