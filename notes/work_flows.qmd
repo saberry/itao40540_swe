@@ -1,0 +1,246 @@
+---
+title: "Work Flows"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+---
+
+I've got a big question for you -- how do you code? Not the act of coding or what language you use...not even what are you trying to accomplish. What is your process of writing code? Do you just start slapping your keyboard and hoping for the best or do you start copying and pasting code from previous projects? We need to start thinking through the process of generating code that will live within the context of a larger project. To that end, should we be putting all of our code into a single file and letting it rip? Absolutely not!
+
+We need to start thinking in terms of projects, a project is a collection of scripts, and each script is created to perform a specific task in service to the project. Now we have to think about something else: our folders/directories. Do you rock folders on your Desktop or do you already have a neatly defined file system? We need to move towards a world where every project is its own directory and important things live in subdirectories. 
+
+Let's think about what a directory structure might entail:
+
+```
+project
+  |_ data
+    |_ raw
+    |_ wrangled
+  |_ scripts
+    |_ data_prep
+    |_ analysis
+  |_ visualizations
+```
+
+While clearly not inclusive of everything that we would ever need to do, this should offer an idea towards how we want to create a workflow for any given project.
+
+If you want any easy way to do this, every computer comes with great functions for making it happen! It doesn't matter if you use a Mac or Windows, you can use `mkdir` to handle this hard work for you. 
+
+```
+mkdir -p C:\Users\sberry5\Documents\project_name\data C:\Users\sberry5\Documents\project_name\scripts
+mkdir C:\Users\sberry5\Documents\project_name\data C:\Users\sberry5\Documents\project_name\scripts
+```
+
+We will get more command line action as we go along, but that is a pretty simple operation!
+
+Let's think about the items that go into those folders now. We can begin with a script that will import our data and get it prepped for analysis:
+
+```{python}
+#| eval: false
+from imblearn.combine import SMOTEENN
+from joblib import dump, load
+import numpy as np
+import pandas as pd
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+work_data = pd.read_csv(
+  "/Users/sethberry/Documents/UDA/notes/python_pipeline/work_data.csv"
+)
+
+work_data = work_data.sample(frac = .1)
+
+encode_cats = pd.get_dummies(work_data['department'], prefix='department')
+
+work_data = work_data.drop({'department'}, axis=1)
+
+work_data = work_data.join(encode_cats)
+
+predictors = work_data.drop('separatedNY', axis=1)
+
+outcome = work_data['separatedNY']
+
+imp_mean = IterativeImputer(random_state=1001)
+
+imputed_data = imp_mean.fit_transform(predictors)
+
+smote_enn = SMOTEENN(random_state=1001)
+
+balanced_data, balanced_outcome = smote_enn.fit_resample(imputed_data, outcome)
+
+X_train, X_test, y_train, y_test = train_test_split(
+  balanced_data, balanced_outcome, test_size=0.3, random_state=1001
+)
+
+X_train_scaler = StandardScaler().fit(X_train)
+
+X_train_scaled = X_train_scaler.transform(X_train)
+
+X_test_scaler = StandardScaler().fit(X_test)
+
+X_test_scaled = X_test_scaler.transform(X_test)
+
+dump(
+  [X_train_scaled, X_test_scaled, y_train, y_test],
+  '/Users/sethberry/Documents/UDA/notes/python_pipeline/model_data.joblib'
+)
+```
+
+Nothing fancy and probably nothing that you haven't seen from other classes. Likely the most important item in there is the use of the `joblib` library to `dump` data into a binary file. If you read the `sklearn` documentation, you'll notice that they recommend saving models and data as joblib files; while `pickle` is certainly common, we will go with the recommendation of the developers. 
+
+Now, what are we going to do with our `model_data.joblib` file? Naturally, we will train a model!
+
+```{python}
+#| eval: false
+from joblib import load, dump
+import numpy as np
+import shap
+from sklearn.metrics import roc_auc_score, balanced_accuracy_score, matthews_corrcoef
+from sklearn.model_selection import RandomizedSearchCV
+import xgboost as xgb
+
+X_train_scaled, X_test_scaled, y_train, y_test = load(
+  '/Users/sethberry/Documents/UDA/notes/python_pipeline/model_data.joblib'
+)
+
+xgb_model = xgb.XGBClassifier()
+
+param_distributions = {
+  'eta': np.linspace(0, 1, 11),
+  'gamma': range(0, 10, 2),
+  'min_child_weight': range(0, 10),
+  'max_depth': range(3, 10),
+  'n_estimators': [50, 100, 200]
+}
+
+xgb_search = RandomizedSearchCV(
+  xgb_model,
+  param_distributions=param_distributions,
+  n_iter=5,
+  scoring='roc_auc',
+  random_state=1001
+)
+
+xgb_search.fit(X_train_scaled, y_train)
+
+xgb_search.best_score_
+
+xgb_search.best_params_
+
+xgb_search.score(X_test_scaled, y_test)
+
+predictions = xgb_search.predict(X_test_scaled)
+
+dump(
+  xgb_search,
+  '/Users/sethberry/Documents/UDA/notes/python_pipeline/xgboost_model.joblib'
+)
+
+balanced_accuracy_score(y_test, predictions)
+
+matthews_corrcoef(y_test, predictions)
+
+auc = roc_auc_score(y_test, xgb_search.predict_proba(X_test_scaled)[:, 1])
+
+Xd = xgb.DMatrix(X_train_scaled, label=y_train)
+
+model = xgb.train(
+  {'max_depth':6,
+  'n_estimators':200},
+  Xd
+)
+
+explainer = shap.TreeExplainer(model)
+
+shap_values = explainer.shap_values(Xd)
+
+column_names = [
+  'age', 'numberPriorJobs', 'proportion401K',
+  'startingSalary', 'currentSalary', 'performance',
+  'monthsToSeparate', 'workDistance', 'department_1',
+  'department_2', 'department_3'
+]
+
+shap.summary_plot(
+  shap_values,
+  X_train_scaled,
+  feature_names = column_names
+)
+```
+
+Again, nothing too fancy here. We are going to fit a model -- `xgb_search` -- and then save it as a joblib file. We will also train a model using the `xgb.train` function and then use the `shap` library to generate a summary plot of the feature importances -- that is just for our own information!
+
+The goal with creating models is to use those models on brand new data! To make that happen, we will need to create a pipeline between our model and new data. 
+
+```{python}
+#| eval: false
+from joblib import load, dump
+from imblearn.combine import SMOTEENN
+import numpy as np
+import pandas as pd
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+link = 'https://2499737.youcanlearnit.net/tabulardata.html'
+
+test_data = pd.read_html(link, match='department', header=0)
+
+test_data = test_data[0]
+
+test_data = test_data.drop('Unnamed: 10', axis=1)
+
+def department_encode(data_name):
+  encode_cats = pd.get_dummies(data_name['department'], prefix='department')
+  new_data = data_name.drop({'department'}, axis=1)
+  encoded_data = new_data.join(encode_cats)
+  return encoded_data
+
+def predictor_outcome_split(data_name):
+  predictors = data_name.drop('separatedNY', axis=1)
+  outcome = data_name['separatedNY']
+  return predictors, outcome
+
+predictors, outcome =
+  test_data.pipe(department_encode).pipe(predictor_outcome_split)
+
+def impute_function(predictors_df):
+  imp_mean = IterativeImputer(random_state=1001)
+  imputed_data = imp_mean.fit_transform(predictors_df)
+  return imputed_data
+
+imputed_predictors = impute_function(predictors)
+
+def smote_balance_function(imputed_data_name, outcome_name):
+  smote_enn = SMOTEENN(random_state=1001)
+  balanced_data, balanced_outcome = smote_enn.fit_resample(
+  imputed_data_name, outcome_name
+  )
+  return balanced_data, balanced_outcome
+
+balanced_data, balanced_outcome = smote_balance_function(imputed_predictors,
+outcome)
+
+X_test_scaler = StandardScaler().fit(balanced_data)
+
+X_test_scaled = X_test_scaler.transform(balanced_data)
+
+xgb_model = load(
+  '/Users/sethberry/Documents/UDA/notes/python_pipeline/xgboost_model.joblib'
+)
+
+predictions = xgb_model.predict(X_test_scaled)
+
+confusion_matrix(balanced_outcome, predictions)
+```
+
+You'll notice that we created some functions in this script, but those could have just as easily in separate scripts (and probably should have)!
+

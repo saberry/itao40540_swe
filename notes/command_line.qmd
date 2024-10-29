@@ -1,0 +1,81 @@
+---
+title: "The Command Line Interface"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+---
+
+The command line -- the black box of unimaginable terror -- contains nearly every tool that your computer needs. I'll surface this now -- the Mac command line is far superior to the Windows command prompt. There is an endless supply of commands that you can use to do very basic things; think of anything that would require some mouse clicks of your computer and there is a CLI tool for doing it. While there is a ton of power there, I want to focus on a few things: basic navigation, running scripts, and text editors! 
+
+## Basic Navigation 
+
+## Running Scripts
+
+Let's just grab the basic dash example and we will work from there:
+
+```{python, eval = FALSE}
+from dash import Dash, html, dcc, callback, Output, Input
+import plotly.express as px
+import pandas as pd
+
+df = pd.read_csv(
+  'https://raw.githubusercontent.com/plotly/datasets/master/gapminder_unfiltered.csv'
+)
+
+app = Dash()
+
+app.layout = [
+    html.H1(children='Title of Dash App', style={'textAlign':'center'}),
+    dcc.Dropdown(df.country.unique(), 'Canada', id='dropdown-selection'),
+    dcc.Graph(id='graph-content')
+]
+
+@callback(
+    Output('graph-content', 'figure'),
+    Input('dropdown-selection', 'value')
+)
+
+def update_graph(value):
+    dff = df[df.country==value]
+    return px.line(dff, x='year', y='pop')
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+We will call this file, `app.py`. 
+
+## Text Editors
+
+Prepare for pain and frustration! In one way, shape, or form, command lines have tools for editing text. You might be asking why you would ever need to do this; after all, you have a perfectly good IDE for writing code! While true, many systems that contain your files will not give you access to an IDE and you might need to hit your files with a quick edit. Using a command line editor becomes an awesomely efficient way to test files. 
+
+If you are using a Windows machine and have Git installed (you should have Git installed), you can do the following:
+
+```
+"C:\Program Files\Git\usr\bin\vim.exe" app.py
+```
+
+On a Mac, you can just do this:
+
+```
+vim app.py
+```
+
+Whichever one you use, there are a few things to keep in mind:
+
+```
+i - insert mode
+ESC - leave insert mode
+yy - yank line (copy)
+p - put line
+dd - delete line
+:w - write
+:q - quite
+:wq - write and quit
+```
+
+:::{.callout-note}
+Vim -- Vi Improved -- is absolutely bonkers. It was made for programmers, by programmers, before the mouse became a thing. It will make you feel bad about yourself and question your abilities. If you want more info on what it can do, check out this link: https://docs.oracle.com/cd/E19455-01/806-2902/6jc3b36ee/index.html
+:::

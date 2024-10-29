@@ -1,0 +1,280 @@
+---
+title: "Defensive Programming"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+---
+
+How do we know that our code returns the correct result? Generally, we are looking at the code, running it, and evaluating the outcomes. What happens, though, when our code is out there for other people to use? If we work off the idea that people are always going to cause problems, we need a way to ensure that they won't use our code in such a way that they get wrong answers. We need to assume that bad things will happen and we are just going to plan for the future. 
+
+
+We will focus on a few big ideas here: 
+
+1. **Preconditions** dictate that something needs to be true at the start of the function. 
+
+2. **Postconditions** dictate that a function must return what we want at the end. Note that this isn't really a thing in Python!
+
+3. **Invariants** dicatate that something is true at any point in the function. 
+
+## Try Except
+
+The `try` and `except` blocks are used to catch exceptions in Python. An exception is a runtime error that stops the program from running. 
+
+
+Let's consider the following chunk of code:
+
+```{python}
+#| eval: false
+def predictor_outcome_split(data_name):
+  predictors = data_name.drop('separatedNY', axis=1)
+  outcome = data_name['separatedNY']
+  return predictors, outcome
+```
+
+The goald of this function is to take a data frame, remove the outcome/target from the data, keep a set of predictors, and then return objects for the predictors and the outcome. You'll notice that we are basing our entire function around the notion that the data will have a column called `separatedNY`. What if we are wrong? What if someone misspelled it or otherwise changed the name? That is where we can start to use `try` and `except` blocks. 
+
+
+```{python}
+#| eval: false
+def predictor_outcome_split(data_name):
+  try:
+    predictors = data_name.drop('separatedNY', axis=1)
+    outcome = data_name['separatedNY']
+    return predictors, outcome
+  except KeyError:
+    print('The outcome column name is not correct\n it needs to be separatedNY')
+```
+
+The `try` block does exactly what it says it is going to do: try the following lines of code and return whatever you can. If something wrong happens, though, the `except` block will catch the error and print out a message. This all sounds good, but we can likely do better than just catching an error and saying that we have an error. Instead, let's see if any columns in the data contain the substring `separated`. If the data does have such a column, we will just rename it to be "separatedNY" and carry on with our function. We might even leave a message for the user, telling them that we found a variable that looks right, but they will want to confirm!
+
+```{python}
+#| eval: false
+
+def predictor_outcome_split(data_name):
+  try:
+    predictors = data_name.drop('separatedNY', axis=1)
+    outcome = data_name['separatedNY']
+    return predictors, outcome
+  except KeyError:
+    for col in data_name.columns:
+      if 'separated' in col:
+        print(f'Found a column that looks like the outcome variable: {col}')
+        print('Please confirm that this is the correct column')
+        data_name.rename(columns={col: 'separatedNY'}, inplace=True)
+        predictors = data_name.drop('separatedNY', axis=1)
+        outcome = data_name['separatedNY']
+        return predictors, outcome
+```
+
+
+Let's see if it works!
+
+```{python}
+import pandas as pd
+import warnings
+
+link = 'https://2499737.youcanlearnit.net/tabulardata.html'
+
+test_data = pd.read_html(link, match='department', header=0)
+
+test_data = test_data[0]
+
+test_data = test_data.drop('Unnamed: 10', axis=1)
+
+def predictor_outcome_split(data_name):
+  try:
+    predictors = data_name.drop('separatedNY', axis=1)
+    outcome = data_name['separatedNY']
+    return predictors, outcome
+  except KeyError:
+    for col in data_name.columns:
+      if 'separated' in col:
+        warnings.warn(f'Found a column that looks like the outcome variable: {col}')
+        warnings.warn('Please confirm that this is the correct column before modeling!')
+        data_name.rename(columns={col: 'separatedNY'}, inplace=True)
+        predictors = data_name.drop('separatedNY', axis=1)
+        outcome = data_name['separatedNY']
+        return predictors, outcome
+
+predictors, outcome = predictor_outcome_split(test_data)
+
+predictors
+
+outcome
+```
+
+Now let's try it with something that should cause a problem. We can begin by creating some fake data:
+
+```{python}
+bad_columns = {'separated_ny': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
+
+bad_df = pd.DataFrame(data=bad_columns)
+
+predictor_outcome_split(bad_df)
+```
+
+And with something else:
+
+```{python}
+worse_columns = {'Separated_ny': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
+
+worse_df = pd.DataFrame(data=worse_columns)
+
+predictor_outcome_split(worse_df)
+```
+
+That sucks...nothing happened! A few things are at play here. First, we don't have any ending error message if "separated" is not in the columns -- we can fix that with a `raise` at the end. Second, the `in` keyword isn't smart enough to deal with capitalization -- we can fix that issue by using the `str.contains` method:
+
+```{python}
+def predictor_outcome_split(data_name):
+  try:
+    predictors = data_name.drop('separatedNY', axis=1)
+    outcome = data_name['separatedNY']
+    return predictors, outcome
+  except KeyError:
+    for col in data_name.columns:
+      if data_name.columns.str.contains('[Ss]eparate').any():
+        warnings.warn(f'Found a column that looks like the outcome variable: {col}')
+        warnings.warn('Please confirm that this is the correct column before modeling!')
+        data_name.rename(columns={col: 'separatedNY'}, inplace=True)
+        predictors = data_name.drop('separatedNY', axis=1)
+        outcome = data_name['separatedNY']
+        return predictors, outcome
+      else: raise KeyError('No separated outcome column detected!')
+      
+predictor_outcome_split(worse_df)
+```
+
+And now something that shouldn't work:
+
+```{python}
+#| error: true
+worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
+
+worst_df = pd.DataFrame(data=worst_columns)
+
+predictor_outcome_split(worst_df)
+```
+
+Excellent! We get the see of errors, ending with our message! And while that might seem like we are done, we are not! Remember that list of conditions from the beginning? We need to add some additional check into our function to ensure the following:
+
+1) The function is being given a pandas data frame (precondition). 
+2) The data frame has a column that looks like the outcome variable (invariants -- we already have that part down).
+3) Python doesn't really have postconditions, due to duck typing. 
+
+```{python}
+#| error: true
+def predictor_outcome_split(data_name):
+  if not isinstance(data_name, pd.DataFrame):
+    raise TypeError('The data_name argument must be a pandas data frame!')
+  try:
+    predictors = data_name.drop('separatedNY', axis=1)
+    outcome = data_name['separatedNY']
+    return predictors, outcome
+  except KeyError:
+    for col in data_name.columns:
+      if data_name.columns.str.contains('[Ss]eparate').any():
+        warnings.warn(f'Found a column that looks like the outcome variable: {col}')
+        warnings.warn('Please confirm that this is the correct column before modeling!')
+        data_name.rename(columns={col: 'separatedNY'}, inplace=True)
+        predictors = data_name.drop('separatedNY', axis=1)
+        outcome = data_name['separatedNY']
+        return predictors, outcome
+    except KeyError: 
+      print('No separated outcome column detected!')
+    
+predictor_outcome_split(test_data)
+predictor_outcome_split(bad_df)
+predictor_outcome_split(worst_df)
+```
+
+## Unit Testing
+
+If the idea of writing code to test code sounds fun, then unit testing is going to be your jam! Even if that sounds horrible, it is a useful endeavour. As you can see from above, testing these functions can be a bit of a pain.  Unit tests offer us a way to programmatically test functions. While there is some setup work, it will be well worth it in the end!
+
+If we wanted to get fancy, we could move our function to a class:
+
+```{python}
+#| error: true
+
+class data_preparation:
+  def __init__(self, data_name):
+    self.data_name = data_name
+    
+  def predictor_outcome_split(self):
+    if not isinstance(self.data_name, pd.DataFrame):
+      raise TypeError('The data_name argument must be a pandas data frame!')
+    try:
+      predictors = self.data_name.drop('separatedNY', axis=1)
+      outcome = self.data_name['separatedNY']
+      return predictors, outcome
+    except KeyError:
+      for col in self.data_name.columns:
+        if self.data_name.columns.str.contains('[Ss]eparate').any():
+          warnings.warn(f'Found a column that looks like the outcome variable: {col}')
+          warnings.warn('Please confirm that this is the correct column before modeling!')
+          self.data_name.rename(columns={col: 'separatedNY'}, inplace=True)
+          predictors = self.data_name.drop('separatedNY', axis=1)
+          outcome = self.data_name['separatedNY']
+          return predictors, outcome
+        else: raise KeyError('No separated outcome column detected!')
+```
+
+And save that to a file called, `data_preparation.py` and test through the terminal. For now, though, we can just do it interactively. We will use the `unittest` module, but many others are available.
+
+```{python}
+#| error: true
+
+import unittest
+
+class TestPreparation(unittest.TestCase):
+  
+  def test_predictor_outcome_split(self):
+    """Good Test"""
+    test_data = pd.read_html(link, match='department', header=0)
+    test_data = test_data[0]
+    test_data = test_data.drop('Unnamed: 10', axis=1)
+    predictors, outcome = predictor_outcome_split(test_data)
+    self.assertIsInstance(predictors, pd.DataFrame)
+    self.assertIsInstance(outcome, pd.Series)
+  
+  def test_bad_data(self):
+    """Bad Test"""
+    bad_columns = {'separated_ny': [1, 2, 3, 4, 5], 
+      'age': [5, 4, 3, 2, 1]} 
+    bad_df = pd.DataFrame(data=bad_columns)
+    predictors, outcome = predictor_outcome_split(bad_df)
+    self.assertIsInstance(predictors, pd.DataFrame)
+    self.assertIsInstance(outcome, pd.Series)
+      
+  def test_worse_data(self):
+    """Worse Test"""
+    worse_columns = {'Separated_ny': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
+    worse_df = pd.DataFrame(data=worse_columns)
+    predictors, outcome = predictor_outcome_split(worse_df)
+    self.assertIsInstance(predictors, pd.DataFrame)
+    self.assertIsInstance(outcome, pd.Series)
+      
+  def test_worst_data(self):
+    """Worst Test"""
+    worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
+    worst_df = pd.DataFrame(data=worst_columns)
+    with self.assertRaises(KeyError):
+      predictors, outcome = predictor_outcome_split(worst_df)
+      
+  def test_worse_data_wrong(self):
+    """Testing if worst data is not intance of DataFrame or series"""
+    worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [15, 14, 13, 12, 11]} 
+    worst_df = pd.DataFrame(data=worst_columns)
+    predictors, outcome = predictor_outcome_split(worst_df)
+    self.assertNotIsInstance(predictors, pd.DataFrame)
+    self.assertNotIsInstance(outcome, pd.Series)
+
+if __name__ == '__main__':
+  unittest.main(verbosity=3)
+  
+  
+```
+
