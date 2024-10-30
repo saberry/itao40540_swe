@@ -238,33 +238,25 @@ class TestPreparation(unittest.TestCase):
     predictors, outcome = predictor_outcome_split(test_data)
     self.assertIsInstance(predictors, pd.DataFrame)
     self.assertIsInstance(outcome, pd.Series)
-  
+    
   def test_bad_data(self):
     """Bad Test"""
-    bad_columns = {'separated_ny': [1, 2, 3, 4, 5], 
-      'age': [5, 4, 3, 2, 1]} 
+    bad_columns = {'separated_ny': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
     bad_df = pd.DataFrame(data=bad_columns)
     predictors, outcome = predictor_outcome_split(bad_df)
     self.assertIsInstance(predictors, pd.DataFrame)
     self.assertIsInstance(outcome, pd.Series)
       
-  def test_worse_data(self):
-    """Worse Test"""
-    worse_columns = {'Separated_ny': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
-    worse_df = pd.DataFrame(data=worse_columns)
-    predictors, outcome = predictor_outcome_split(worse_df)
-    self.assertIsInstance(predictors, pd.DataFrame)
-    self.assertIsInstance(outcome, pd.Series)
-      
   def test_worse_data_wrong(self):
-    """Testing if worst data is None type"""
+    """Testing if worst data is returns an error"""
     worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [15, 14, 13, 12, 11]}
     worst_df = pd.DataFrame(data=worst_columns)
-    self.assertTrue(predictor_outcome_split(worst_df) == None)
-
+    self.assertRaises(KeyError, predictor_outcome_split, (worst_df)) 
+        
 if __name__ == '__main__':
   unittest.main(verbosity=3)
-  
-  
+          
+          
 ```
-
+          
+          
