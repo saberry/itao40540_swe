@@ -14,22 +14,21 @@ def predictor_outcome_split(data_name):
     if not isinstance(data_name, pd.DataFrame):
        raise TypeError('The data_name argument must be a pandas data frame!')
     try:
-      predictors = data_name.drop('separatedNY', axis=1)
-      outcome = data_name['separatedNY']
-      return predictors, outcome
+        predictors = data_name.drop('separatedNY', axis=1)
+        outcome = data_name['separatedNY']
+        return predictors, outcome
     except KeyError:
-       for col in data_name.columns:
-        if data_name.columns.str.contains('[Ss]eparate').any():
-          warnings.warn(f'Found a column that looks like the outcome variable: {col}')
-          warnings.warn('Please confirm that this is the correct column before modeling!')
-          data_name.rename(columns={col: 'separatedNY'}, inplace=True)
-          predictors = data_name.drop('separatedNY', axis=1)
-          outcome = data_name['separatedNY']
-          return predictors, outcome
-    except KeyError: 
-      print('No separated outcome column detected!')
+        for col in data_name.columns:
+            if data_name.columns.str.contains('[Ss]eparate').any():
+                warnings.warn(f'Found a column that looks like the outcome variable: {col}')
+                warnings.warn('Please confirm that this is the correct column before modeling!')
+                data_name.rename(columns={col: 'separatedNY'}, inplace=True)
+                predictors = data_name.drop('separatedNY', axis=1)
+                outcome = data_name['separatedNY']
+                return predictors, outcome
+    raise KeyError('No separated outcome column detected!')
     
-bad_columns = {'separated_ny': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
+bad_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [5, 4, 3, 2, 1]} 
 
 bad_df = pd.DataFrame(data=bad_columns)
 
