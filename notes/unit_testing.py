@@ -53,20 +53,13 @@ class TestPreparation(unittest.TestCase):
        self.assertIsInstance(outcome, pd.Series)
     
     def test_worse_data_wrong(self):
-        """Testing if worst data is None type"""
+        """Testing if worst data is returns an error"""
         worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [15, 14, 13, 12, 11]}
         worst_df = pd.DataFrame(data=worst_columns)
-        self.assertTrue(predictor_outcome_split(worst_df) == None) 
+        self.assertRaises(KeyError, predictor_outcome_split, (worst_df)) 
     
           
 if __name__ == '__main__':
   unittest.main(verbosity=3)
 
-
-def test_worst_data_wrong(self):
-        """Testing if worst data is not intance of DataFrame or series"""
-        worst_columns = {'outcome': [1, 2, 3, 4, 5], 'age': [15, 14, 13, 12, 11]} 
-        worst_df = pd.DataFrame(data=worst_columns)
-        predictors, outcome = predictor_outcome_split(worst_df)
-        self.assertNotIsInstance(predictors, pd.DataFrame)
-        self.assertNotIsInstance(outcome, pd.Series)
+  
