@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
+import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.sentiment.sentiment_analyzer import SentimentAnalyzer
 from textblob import TextBlob
+
+nltk.download('vader_lexicon')
 
 # Dear God -- https://docs.streamlit.io/develop/api-reference
 
